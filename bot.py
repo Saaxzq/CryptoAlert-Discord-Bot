@@ -23,7 +23,6 @@ status_cycle = itertools.cycle(["USD", "EUR", "BTC"])
 class MyBot(discord.Client):
     def __init__(self):
         intents = discord.Intents.default()
-        intents.message_content = True 
         super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
 
@@ -33,7 +32,6 @@ class MyBot(discord.Client):
         print("Servidores conectados:")
         for guild in self.guilds:
             print(f" - {guild.name}")
-        # Inicia a tarefa de loop para o status
         update_status.start()
 
 bot = MyBot()
@@ -140,7 +138,6 @@ async def update_status():
                 await channel.send(embed=embed)
             except Exception as e:
                 print(f"❌ Erro ao enviar alerta para o canal #{alert_channel_name}: {e}")
-
     last_prices = prices
 
 @update_status.before_loop

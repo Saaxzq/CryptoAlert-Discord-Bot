@@ -12,6 +12,10 @@ CryptO Alert é um bot de monitoramento de moedas que te mantém atualizado sobr
 
 📊 Status Dinâmico: Atualiza o status do bot a cada 10 segundos, alternando entre as cotações das moedas para visualização rápida.
 
+## 🌐 Fonte dos Dados ##
+
+As cotações do Dólar, Euro e Bitcoin são obtidas em tempo real através da API gratuita da *AwesomeAPI*.
+
 ## 📝 Comandos Fáceis: ##
 
 /cotacao: Mostra um resumo completo das cotações atuais, incluindo a variação do dólar.
