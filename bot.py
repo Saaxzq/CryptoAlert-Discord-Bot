@@ -6,20 +6,23 @@ import requests
 import itertools
 import traceback
 import os
+import sys
+import codecs
 
+sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
 load_dotenv()
 
-#    Pega o token 
+# Pega o token 
 TOKEN = os.getenv("DISCORD_TOKEN")
 if TOKEN is None:
     raise ValueError("❌ Token do Discord não encontrado! Verifique o Secrets do Replit.")
 
-#    Últimos preços salvos    
+# Últimos preços salvos 
 last_prices = {"USD": None, "EUR": None, "BTC": None}
 alert_channel_name = "geral"
 status_cycle = itertools.cycle(["USD", "EUR", "BTC"])
 
-#    Classe do bot        
+# Classe do bot 
 class MyBot(discord.Client):
     def __init__(self):
         intents = discord.Intents.default()
@@ -36,22 +39,23 @@ class MyBot(discord.Client):
 
 bot = MyBot()
 
-#   Função para pegar preços  
+# Função para pegar preços 
 def get_prices():
     url = "https://economia.awesomeapi.com.br/last/USD-BRL,EUR-BRL,BTC-BRL"
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=5)
+        response.raise_for_status()
         data = response.json()
         return {
             "USD": float(data["USDBRL"]["bid"]),
             "EUR": float(data["EURBRL"]["bid"]),
             "BTC": float(data["BTCBRL"]["bid"])
         }
-    except Exception as e:
-        print(f"❌ Erro ao pegar preços: {e}")
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Erro ao pegar preços da API: {e}")
         return last_prices
 
-#      Lista de erros      
+# 
 @bot.event
 async def on_error(event, *args, **kwargs):
     with open("discord_bot_errors.log", "a", encoding="utf-8") as f:
@@ -60,37 +64,46 @@ async def on_error(event, *args, **kwargs):
         f.write("\n\n")
     print(f"❌ Erro no evento: {event} (veja discord_bot_errors.log)")
 
-#       Comando /cotacao      
+# Comando /cotacao 
 @bot.tree.command(name="cotacao", description="Mostra a cotação do dólar, euro e bitcoin")
 async def cotacao(interaction: discord.Interaction):
-    global last_prices
-    prices = get_prices()
+    await interaction.response.defer()
 
-    if last_prices["USD"] is not None:
-        diff = prices["USD"] - last_prices["USD"]
-        if diff > 0:
-            diff_text = f" ({diff:+.2f}) 🔺"
-            color = discord.Color.green()
-        elif diff < 0:
-            diff_text = f" ({diff:+.2f}) 🔻"
-            color = discord.Color.red()
+    try:
+        prices = get_prices()
+
+        if prices["USD"] is not None:
+            if last_prices["USD"] is not None:
+                diff = prices["USD"] - last_prices["USD"]
+                if diff > 0:
+                    diff_text = f" ({diff:+.2f}) 🔺"
+                    color = discord.Color.green()
+                elif diff < 0:
+                    diff_text = f" ({diff:+.2f}) 🔻"
+                    color = discord.Color.red()
+                else:
+                    diff_text = " (0.00)"
+                    color = discord.Color.greyple()
+            else:
+                diff_text = ""
+                color = discord.Color.greyple()
         else:
-            diff_text = " (0.00)"
+            diff_text = ""
             color = discord.Color.greyple()
-    else:
-        diff_text = ""
-        color = discord.Color.greyple()
+        
+        embed = discord.Embed(title="💹 Cotações Atuais", color=color)
+        embed.add_field(name="💵 Dólar", value=f"R$ {prices['USD']:.2f}{diff_text}", inline=False)
+        embed.add_field(name="💶 Euro", value=f"R$ {prices['EUR']:.2f}", inline=False)
+        embed.add_field(name="₿ Bitcoin", value=f"R$ {prices['BTC']:.2f}", inline=False)
+        embed.set_footer(text="Fonte: AwesomeAPI")
 
-    embed = discord.Embed(title="💹 Cotações Atuais", color=color)
-    embed.add_field(name="💵 Dólar", value=f"R$ {prices['USD']:.2f}{diff_text}", inline=False)
-    embed.add_field(name="💶 Euro", value=f"R$ {prices['EUR']:.2f}", inline=False)
-    embed.add_field(name="₿ Bitcoin", value=f"R$ {prices['BTC']:.2f}", inline=False)
-    embed.set_footer(text="Fonte: AwesomeAPI")
+        await interaction.followup.send(embed=embed)
+    
+    except Exception as e:
+        print(f"❌ Erro no comando /cotacao: {e}")
+        await interaction.followup.send("❌ Não foi possível obter as cotações no momento. Tente novamente mais tarde.")
 
-    last_prices = prices
-    await interaction.response.send_message(embed=embed)
-
-#  Comando /setcanal  
+# Comando /setcanal 
 @bot.tree.command(name="setcanal", description="Define o canal onde os alertas do dólar serão enviados")
 @app_commands.describe(nome="Nome do canal")
 async def setcanal(interaction: discord.Interaction, nome: str):
@@ -102,7 +115,7 @@ async def setcanal(interaction: discord.Interaction, nome: str):
     else:
         await interaction.response.send_message(f"❌ Canal '{nome}' não encontrado no servidor.")
 
-#   Loop de status e alertas
+# Loop de status e alertas
 @tasks.loop(seconds=10)
 async def update_status():
     global last_prices
