@@ -9,7 +9,7 @@ import os
 
 load_dotenv()
 
-#    Pega o token do Secrets  #
+#    Pega o token 
 TOKEN = os.getenv("DISCORD_TOKEN")
 if TOKEN is None:
     raise ValueError("❌ Token do Discord não encontrado! Verifique o Secrets do Replit.")
@@ -19,21 +19,15 @@ last_prices = {"USD": None, "EUR": None, "BTC": None}
 alert_channel_name = "geral"
 status_cycle = itertools.cycle(["USD", "EUR", "BTC"])
 
-#        Classe do bot        
+#    Classe do bot        
 class MyBot(discord.Client):
-    # AQUI: A correção do nome do construtor
     def __init__(self):
-        # AQUI: A forma correta de passar as intents para o construtor da classe pai
         intents = discord.Intents.default()
-        intents.message_content = True  # necessário para ler mensagens
+        intents.message_content = True 
         super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
 
     async def on_ready(self):
-        # O self.tree.sync() é um método síncrono, então pode levar tempo
-        # para a árvore de comandos ser sincronizada, especialmente em guilds grandes.
-        # Para evitar erros de timeout e garantir que o bot está pronto,
-        # é uma boa prática usar await.
         await self.tree.sync()
         print(f"✅ Bot {self.user} conectado e comandos sincronizados globalmente!")
         print("Servidores conectados:")
@@ -42,7 +36,6 @@ class MyBot(discord.Client):
         # Inicia a tarefa de loop para o status
         update_status.start()
 
-# AQUI: Cria uma instância da classe MyBot
 bot = MyBot()
 
 #   Função para pegar preços  
@@ -60,7 +53,7 @@ def get_prices():
         print(f"❌ Erro ao pegar preços: {e}")
         return last_prices
 
-#      Listener de erros      
+#      Lista de erros      
 @bot.event
 async def on_error(event, *args, **kwargs):
     with open("discord_bot_errors.log", "a", encoding="utf-8") as f:
@@ -120,8 +113,7 @@ async def update_status():
     moeda = next(status_cycle)
     valor = prices[moeda]
     activity_text = f"{moeda}: R$ {valor:.2f}"
-    # É uma boa prática usar try...except em loops de tarefas para evitar que o loop pare
-    # em caso de erro.
+
     try:
         await bot.change_presence(
             status=discord.Status.online,
@@ -143,10 +135,7 @@ async def update_status():
             )
             embed.set_footer(text="Fonte: AwesomeAPI")
             print(f"📢 Alerta enviado: R$ {last_prices['USD']:.2f} → R$ {prices['USD']:.2f}")
-            # A linha abaixo é duplicada e não é necessária
-            # channel = discord.utils.get(bot.get_all_channels(), name=alert_channel_name)
-            # Adicionei um try...except para enviar a mensagem, caso o canal não possa ser encontrado
-            # ou haja algum outro erro.
+
             try:
                 await channel.send(embed=embed)
             except Exception as e:
@@ -154,11 +143,9 @@ async def update_status():
 
     last_prices = prices
 
-# Certifica-se de que o loop só é executado quando o bot está pronto
 @update_status.before_loop
 async def before_update_status():
     await bot.wait_until_ready()
 
-# AQUI: Adicionei esta linha para ter certeza de que o bot irá rodar.
 if __name__ == '__main__':
     bot.run(TOKEN)
